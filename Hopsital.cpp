@@ -17,6 +17,7 @@
 #include <iostream>
 #include <list>
 #include <vector>
+#include <unordered_map>
 #include <regex>
 using namespace std;
 class Pacient;
@@ -30,6 +31,7 @@ list <Pacient*> gPacient;
 list <CadruMedical*> gCadreMedicale;
 list <AdministrareMedicamente*> gAdministrareMedicamente;
 list <Consultari*> gConsultari;
+MYSQL* handler;
 
 // define a time data structure and time interval structure
 struct TimeData {
@@ -152,6 +154,73 @@ public:
         }
 
         return persistanceResults;
+    }
+
+    bool deleteById(const char* table, int id) {
+        string query = "DELETE FROM " + string(table) + " WHERE id = " + to_string(id);
+
+        int status = mysql_query(handler, query.c_str());
+
+        if (status == 0) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    bool insertable(const char* table, vector<pair<string, string>> queryBuilder) {
+        string query = "INSERT INTO " + string(table) + " (";
+        
+        int k = 0;
+        for (auto it = queryBuilder.begin(); it != queryBuilder.end(); it++) {
+            if (k == queryBuilder.size() - 1) {
+                query += (it->first);
+            }
+            else {
+                query += (it->first + ", ");
+            }
+
+            k++;
+        }
+
+        query += ") VALUES (";
+        k = 0;
+        for (auto it = queryBuilder.begin(); it != queryBuilder.end(); it++) {
+            if (k == queryBuilder.size() - 1) {
+                query += ("'" + (it->second) + "'");
+            }
+            else {
+                query += ("'" + (it->second) + "'" + ", ");
+            }
+
+            k++;
+        }
+        query += ")";
+
+        cout << query << endl;
+
+        int status = mysql_query(handler, query.c_str());
+        if (status == 0) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    int getLatestId(const char* table) {
+        string query = "SELECT IFNULL(id, 1) FROM " + string(table) + " ORDER BY id DESC LIMIT 1";
+        int status = mysql_query(handler, query.c_str());
+
+        if (!status) {
+            MYSQL_RES* res = mysql_store_result(handler);
+
+            MYSQL_ROW row;
+            while (row = mysql_fetch_row(res)) {
+                return atoi(row[0]);
+            }
+        }
     }
 };
 DB* DB::instance = NULL;
@@ -777,15 +846,59 @@ void GenerateMenuLayout(int type) {
 
                 switch (type) {
                     case 0: {
-                        gCadreMedicale.push_back(new Asistent(0, CMName, CMDepartament, CMPacients, workingInterval, CMWorkingYears, CMRezident));
+                        vector<pair<string, string>> insertable = {
+                            {"name", CMName},
+                            {"ds_hour", to_string(workingInterval.first.hour)},
+                            {"df_hour", to_string(workingInterval.second.hour)},
+                            {"ds_minute", to_string(workingInterval.first.minute)},
+                            {"df_minute", to_string(workingInterval.second.minute)},
+                            {"ds_second", to_string(workingInterval.first.second)},
+                            {"df_second", to_string(workingInterval.second.second)},
+                            {"departament", CMDepartament},
+                            {"working_years", to_string(CMWorkingYears)},
+                            {"resident", to_string(CMRezident)},
+                        };
+                        DB::GetInstance(handler)->insertable("asistents", insertable);
+
+                        gCadreMedicale.push_back(new Asistent(DB::GetInstance(handler)->getLatestId("asistents"), CMName, CMDepartament, CMPacients, workingInterval, CMWorkingYears, CMRezident));
                         break;
                     }
                     case 1: {
-                        gCadreMedicale.push_back(new Medic(0, CMName, CMDepartament, CMPacients, workingInterval, CMWorkingYears, CMRezident, CMSpecializare));
+                        vector<pair<string, string>> insertable = {
+                            {"name", CMName},
+                            {"ds_hour", to_string(workingInterval.first.hour)},
+                            {"df_hour", to_string(workingInterval.second.hour)},
+                            {"ds_minute", to_string(workingInterval.first.minute)},
+                            {"df_minute", to_string(workingInterval.second.minute)},
+                            {"ds_second", to_string(workingInterval.first.second)},
+                            {"df_second", to_string(workingInterval.second.second)},
+                            {"departament", CMDepartament},
+                            {"working_years", to_string(CMWorkingYears)},
+                            {"resident", to_string(CMRezident)},
+                            {"specializare", CMSpecializare},
+                        };
+                        DB::GetInstance(handler)->insertable("medics", insertable);
+
+                        gCadreMedicale.push_back(new Medic(DB::GetInstance(handler)->getLatestId("medics"), CMName, CMDepartament, CMPacients, workingInterval, CMWorkingYears, CMRezident, CMSpecializare));
                         break;
                     }
                     case 2: {
-                        gCadreMedicale.push_back(new MedicPrimar(0, CMName, CMDepartament, CMPacients, workingInterval, CMWorkingYears, CMRezident, CMSpecializare));
+                        vector<pair<string, string>> insertable = {
+                            {"name", CMName},
+                            {"ds_hour", to_string(workingInterval.first.hour)},
+                            {"df_hour", to_string(workingInterval.second.hour)},
+                            {"ds_minute", to_string(workingInterval.first.minute)},
+                            {"df_minute", to_string(workingInterval.second.minute)},
+                            {"ds_second", to_string(workingInterval.first.second)},
+                            {"df_second", to_string(workingInterval.second.second)},
+                            {"departament", CMDepartament},
+                            {"working_years", to_string(CMWorkingYears)},
+                            {"resident", to_string(CMRezident)},
+                            {"specializare", CMSpecializare},
+                        };
+                        DB::GetInstance(handler)->insertable("primary_medics", insertable);
+
+                        gCadreMedicale.push_back(new MedicPrimar(DB::GetInstance(handler)->getLatestId("primary_medics"), CMName, CMDepartament, CMPacients, workingInterval, CMWorkingYears, CMRezident, CMSpecializare));
                         break;
                     }
                 }
@@ -1055,6 +1168,12 @@ void UpdateInterface(CadruMedical *cadruMedical, int &cmSelected) {
                     gCadreMedicale.remove(deletableCadru);
 
                     if (deletableCadru != NULL) {
+                        if (dynamic_cast<MedicPrimar*>(deletableCadru)) {
+                            DB::GetInstance(handler)->deleteById("primary_medics", deletableCadru->getId());
+                        }
+                        else if (dynamic_cast<Medic*>(deletableCadru)) {
+                            DB::GetInstance(handler)->deleteById("medics", deletableCadru->getId());
+                        }
                         delete deletableCadru;
                     }
 
@@ -1081,7 +1200,7 @@ void UpdateInterface(CadruMedical *cadruMedical, int &cmSelected) {
 
 int main()
 {
-    MYSQL* handler = mysql_init(NULL);
+    handler = mysql_init(NULL);
     try {
         if (!mysql_real_connect(handler, "localhost", "root", "", "hospitalcpp", 0, NULL, 0))
             throw DatabaseException(mysql_error(handler));
@@ -1535,6 +1654,7 @@ int main()
                             gAdministrareMedicamente.remove(deletableAM);
 
                             if (deletableAM != NULL) {
+                                DB::GetInstance(handler)->deleteById("asistents", deletableAM->getId());
                                 delete deletableAM;
                             }
 
@@ -1672,7 +1792,17 @@ int main()
                 ImGui::SetCursorPos(ImVec2(540, 145));
                 if (ImGui::Button("Salveaza", ImVec2(100, 25))) {
                     try {
-                        Pacient* pacient = new Pacient(DEBUG_ID);
+                        vector<pair<string, string>> insertable = {
+                            {"name", pacientName},
+                            {"reason", reason},
+                            {"age", to_string(age)},
+                            {"height", to_string(height)},
+                            {"weight", to_string(weight)},
+                            {"heartbeat_stats", "|"},
+                        };
+                        DB::GetInstance(handler)->insertable("pacients", insertable);
+
+                        Pacient* pacient = new Pacient(DB::GetInstance(handler)->getLatestId("pacients"));
                         gPacient.push_back(pacient);
 
                         // Debug
@@ -1910,6 +2040,7 @@ int main()
                             gPacient.remove(deletablePacient);
 
                             if (deletablePacient != NULL) {
+                                DB::GetInstance(handler)->deleteById("pacients", deletablePacient->getId());
                                 delete deletablePacient;
                             }
 
@@ -1942,7 +2073,7 @@ int main()
         glViewport(0, 0, display_w, display_h);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
-        
+
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
     }
